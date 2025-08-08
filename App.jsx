@@ -1,0 +1,528 @@
+import React, { useEffect, useMemo, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
+import { Separator } from "@/components/ui/separator";
+import { toast } from "sonner";
+import { Plus, Trash2, Save, Upload, Users, Shuffle, Clock, Swords, History, ListOrdered } from "lucide-react";
+
+const uid = () => Math.random().toString(36).slice(2, 9);
+const defaultColors = ["#3b82f6","#ef4444","#22c55e","#f59e0b","#a78bfa","#ec4899","#06b6d4","#10b981","#8b5cf6","#f97316"];
+
+export default function PadelScorerApp() {
+  const [players, setPlayers] = useState([]);
+  const [activeTab, setActiveTab] = useState("match");
+  const [m2v2, setM2v2] = useState({ matches: [], totals: {} });
+  const [american, setAmerican] = useState({ matches: [], totals: {} });
+  const [mexican, setMexican] = useState({ matches: [], totals: {} });
+
+  useEffect(() => {
+    const raw = localStorage.getItem("padel_scorer_state_v2");
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        setPlayers(parsed.players || []);
+        setM2v2(parsed.m2v2 || { matches: [], totals: {} });
+        setAmerican(parsed.american || { matches: [], totals: {} });
+        setMexican(parsed.mexican || { matches: [], totals: {} });
+        setActiveTab(parsed.ui?.activeTab || "match");
+      } catch {}
+    }
+  }, []);
+
+  useEffect(() => {
+    const payload = { players, m2v2, american, mexican, ui: { activeTab } };
+    localStorage.setItem("padel_scorer_state_v2", JSON.stringify(payload));
+  }, [players, m2v2, american, mexican, activeTab]);
+
+  return (
+    <div className="mx-auto max-w-6xl p-4 pb-[5.5rem] sm:pb-4 space-y-4">
+      <header className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Padel Scorer</h1>
+        <div className="flex items-center gap-2">
+          <ImportExport onLoadAll={(data)=>{
+            setPlayers(data.players||[]);
+            setM2v2(data.m2v2||{matches:[], totals:{}});
+            setAmerican(data.american||{matches:[], totals:{}});
+            setMexican(data.mexican||{matches:[], totals:{}});
+          }} />
+        </div>
+      </header>
+
+      <MobileTips />
+
+      <PlayerManager players={players} setPlayers={setPlayers} />
+
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="w-full grid grid-cols-3">
+          <TabsTrigger value="match" className="flex-1">Матч 2×2</TabsTrigger>
+          <TabsTrigger value="american" className="flex-1">Американка</TabsTrigger>
+          <TabsTrigger value="mexican" className="flex-1">Мексиканка</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="match">
+          <Match2v2FinalInput players={players}
+            matches={m2v2.matches}
+            totals={m2v2.totals}
+            onSave={(rec, delta)=>{
+              setM2v2(s=>({ matches:[rec, ...s.matches], totals: applyDelta(s.totals, delta) }));
+            }}
+            onClear={()=> setM2v2(s=>({ ...s, matches: [] }))}
+            onResetTotals={()=> setM2v2(s=>({ ...s, totals: {} }))}
+          />
+        </TabsContent>
+
+        <TabsContent value="american">
+          <SocialRoundFinalInput mode="american" players={players}
+            matches={american.matches}
+            totals={american.totals}
+            onSave={(rec, delta)=> setAmerican(s=>({ matches:[rec, ...s.matches], totals: applyDelta(s.totals, delta) }))}
+            onClear={()=> setAmerican(s=>({ ...s, matches: [] }))}
+            onResetTotals={()=> setAmerican(s=>({ ...s, totals: {} }))}
+          />
+        </TabsContent>
+
+        <TabsContent value="mexican">
+          <SocialRoundFinalInput mode="mexican" players={players}
+            matches={mexican.matches}
+            totals={mexican.totals}
+            onSave={(rec, delta)=> setMexican(s=>({ matches:[rec, ...s.matches], totals: applyDelta(s.totals, delta) }))}
+            onClear={()=> setMexican(s=>({ ...s, matches: [] }))}
+            onResetTotals={()=> setMexican(s=>({ ...s, totals: {} }))}
+          />
+        </TabsContent>
+      </Tabs>
+
+      <footer className="text-xs text-muted-foreground py-6">
+        Сделано на React + Framer Motion. Данные сохраняются локально. Готово для статического хостинга.
+      </footer>
+    </div>
+  );
+}
+
+function MobileTips() {
+  return (
+    <div className="sm:hidden rounded-xl border p-3 text-xs bg-muted/30">
+      Оптимизировано для телефона: крупные кнопки, плавные анимации, вертикальная верстка. Добавьте приложение на домашний экран.
+    </div>
+  );
+}
+
+function PlayerManager({ players, setPlayers }) {
+  const [name, setName] = useState("");
+  const [colorIdx, setColorIdx] = useState(0);
+
+  function addPlayer() {
+    const n = name.trim();
+    if (!n) return;
+    setPlayers([...players, { id: uid(), name: n, color: defaultColors[colorIdx % defaultColors.length] }]);
+    setName(""); setColorIdx(i => (i + 1) % defaultColors.length);
+  }
+
+  function removePlayer(id) { setPlayers(players.filter(p => p.id !== id)); }
+
+  return (
+    <motion.div initial={{opacity:0, y:6}} animate={{opacity:1, y:0}}>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Users className="h-5 w-5"/> Игроки</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="grow max-w-sm">
+              <Label>Имя</Label>
+              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Добавить игрока"/>
+            </div>
+            <div>
+              <Label>Цвет</Label>
+              <div className="flex items-center gap-2">
+                <div className="h-9 w-14 rounded-md border" style={{ background: defaultColors[colorIdx % defaultColors.length] }} />
+                <Button variant="secondary" onClick={() => setColorIdx((i) => (i + 1) % defaultColors.length)} title="Сменить цвет">↻</Button>
+              </div>
+            </div>
+            <Button className="h-10 px-5 text-base" onClick={addPlayer}><Plus className="h-4 w-4 mr-1"/> Добавить</Button>
+          </div>
+
+          {players.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Добавьте минимум 4 игроков для социальных форматов, или 4 для матча 2×2.</p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+              <AnimatePresence>
+                {players.map(p => (
+                  <motion.button key={p.id} layout initial={{opacity:0, scale:0.98}} animate={{opacity:1, scale:1}} exit={{opacity:0, scale:0.98}}
+                    className="flex items-center justify-between rounded-xl border p-3 text-left active:scale-[0.99] transition">
+                    <div className="flex items-center gap-2">
+                      <div className="h-6 w-6 rounded-full border" style={{ background: p.color || "#eee" }}/>
+                      <span className="font-medium">{p.name}</span>
+                    </div>
+                    <Button variant="ghost" onClick={() => removePlayer(p.id)}><Trash2 className="h-4 w-4"/></Button>
+                  </motion.button>
+                ))}
+              </AnimatePresence>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </motion.div>
+  );
+}
+
+function Match2v2FinalInput({ players, matches, totals, onSave, onClear, onResetTotals }) {
+  const [teamA, setTeamA] = useState([]);
+  const [teamB, setTeamB] = useState([]);
+  const [kind, setKind] = useState("classic");
+  const [scoreA, setScoreA] = useState(0);
+  const [scoreB, setScoreB] = useState(0);
+
+  const ready = teamA.length === 2 && teamB.length === 2 && teamA.every(id => !teamB.includes(id));
+
+  function save() {
+    if (!ready) return toast.error("Выберите составы команд");
+    if (scoreA === scoreB) return toast.error("Нужен победитель");
+
+    const winner = scoreA > scoreB ? teamA : teamB;
+    const participants = [...teamA, ...teamB];
+
+    const rec = {
+      id: uid(),
+      date: new Date().toISOString(),
+      type: "2v2",
+      mode: kind,
+      participants,
+      scoreText: `${labelOf(teamA, players)} vs ${labelOf(teamB, players)} — ${scoreA}:${scoreB} (${kind === "race"? "очки" : "сеты"})`,
+    };
+
+    const delta = {};
+    winner.forEach(id => delta[id] = (delta[id] || 0) + 3);
+
+    onSave(rec, delta);
+    setScoreA(0); setScoreB(0);
+    toast.success("Матч сохранён");
+  }
+
+  const board = buildBoard(players, totals);
+
+  return (
+    <div className="grid lg:grid-cols-3 gap-4">
+      <motion.div layout className="lg:col-span-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><Swords className="h-5 w-5"/> Матч 2×2 — итоговый ввод</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid sm:grid-cols-2 gap-3">
+              <TeamPicker label="Команда A" players={players} value={teamA} onChange={setTeamA} />
+              <TeamPicker label="Команда B" players={players} value={teamB} onChange={setTeamB} />
+            </div>
+
+            <div className="grid sm:grid-cols-3 gap-3">
+              <div className="space-y-2">
+                <Label>Тип счёта</Label>
+                <Select value={kind} onValueChange={(v)=> setKind(v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="classic">Классика (сеты)</SelectItem>
+                    <SelectItem value="race">На счёт (очки)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Счёт A</Label>
+                <Input inputMode="numeric" type="number" value={scoreA} onChange={e=> setScoreA(parseInt(e.target.value||"0"))}/>
+              </div>
+              <div>
+                <Label>Счёт B</Label>
+                <Input inputMode="numeric" type="number" value={scoreB} onChange={e=> setScoreB(parseInt(e.target.value||"0"))}/>
+              </div>
+            </div>
+
+            <Button className="h-12" onClick={save}><Save className="h-4 w-4 mr-1"/> Сохранить игру</Button>
+
+            <Separator />
+
+            <HistoryList matches={matches} players={players} emptyText="Пока нет матчей"/>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      <motion.div layout>
+        <LeaderboardCard title="Таблица (2×2)" board={board} onReset={onResetTotals} />
+        <div className="mt-2">
+          <Button variant="outline" onClick={onClear}><History className="h-4 w-4 mr-1"/> Очистить историю 2×2</Button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+function SocialRoundFinalInput({ mode, players, matches, totals, onSave, onClear, onResetTotals }) {
+  const [courtCount, setCourtCount] = useState(1);
+  const [activePairs, setActivePairs] = useState([]);
+  const [roundResults, setRoundResults] = useState([]);
+
+  const eligibleIds = useMemo(()=> players.map(p=>p.id), [players]);
+
+  useEffect(()=>{
+    if (eligibleIds.length >= 4) {
+      const maxCourts = Math.min(Math.floor(eligibleIds.length/4), Math.max(1, courtCount));
+      const pairs = makeRoundPairs(eligibleIds).slice(0, maxCourts);
+      setActivePairs(pairs);
+      setRoundResults(pairs.map((_,i)=>({court:i+1, aScore:0, bScore:0})));
+    } else { setActivePairs([]); setRoundResults([]); }
+  }, [eligibleIds.join(","), courtCount, mode]);
+
+  function saveRound() {
+    if (activePairs.length===0) return;
+
+    const delta = {};
+    const participants = [];
+    activePairs.forEach((q, idx)=>{
+      const [a1,a2,b1,b2] = q; const rr = roundResults[idx];
+      [a1,a2,b1,b2].forEach(id=> participants.push(id));
+      delta[a1] = (delta[a1]||0) + rr.aScore; delta[a2] = (delta[a2]||0) + rr.aScore;
+      delta[b1] = (delta[b1]||0) + rr.bScore; delta[b2] = (delta[b2]||0) + rr.bScore;
+    });
+
+    const scoreText = roundResults.map((r,i)=>`Корт ${i+1}: ${r.aScore}:${r.bScore}`).join("; ");
+    const rec = { id: uid(), date: new Date().toISOString(), type: mode, participants, scoreText };
+    onSave(rec, delta);
+
+    toast.success("Раунд сохранён");
+  }
+
+  function nameOf(id) { return players.find(x => x.id === id)?.name || "?"; }
+
+  const board = buildBoard(players, totals);
+
+  return (
+    <div className="grid lg:grid-cols-3 gap-4">
+      <motion.div layout className="lg:col-span-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><Clock className="h-5 w-5"/> {mode === "american"? "Американка" : "Мексиканка"} — итоговый ввод</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Кортов</Label>
+                <Input inputMode="numeric" type="number" min={1} max={Math.max(1, Math.floor(players.length/4))} value={courtCount} onChange={e=> setCourtCount(parseInt(e.target.value||"1"))}/>
+              </div>
+              <div className="flex items-end text-xs text-muted-foreground">Составы и счёт вводятся по итогам раунда.</div>
+            </div>
+
+            {activePairs.length===0 ? (
+              <p className="text-sm text-muted-foreground">Добавьте минимум 4 игроков.</p>
+            ) : (
+              <div className="grid md:grid-cols-2 gap-3">
+                {activePairs.map((quad, idx)=>{
+                  const [a1,a2,b1,b2] = quad; const rr = roundResults[idx];
+                  return (
+                    <motion.div key={idx} layout initial={{opacity:0, y:6}} animate={{opacity:1, y:0}} className="rounded-2xl border p-3 space-y-2">
+                      <div className="text-sm font-semibold">Корт {idx+1}</div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <div className="font-medium">Команда A</div>
+                          <div className="text-sm">{nameOf(a1)} + {nameOf(a2)}</div>
+                          <div className="mt-1 flex items-center gap-2">
+                            <Input inputMode="numeric" className="w-20 text-center" value={rr.aScore} onChange={e=> setRoundResults(prev=> prev.map((x,i)=> i===idx? {...x, aScore: parseInt(e.target.value||"0")}:x))} />
+                          </div>
+                        </div>
+                        <div>
+                          <div className="font-medium">Команда B</div>
+                          <div className="text-sm">{nameOf(b1)} + {nameOf(b2)}</div>
+                          <div className="mt-1 flex items-center gap-2">
+                            <Input inputMode="numeric" className="w-20 text-center" value={rr.bScore} onChange={e=> setRoundResults(prev=> prev.map((x,i)=> i===idx? {...x, bScore: parseInt(e.target.value||"0")}:x))} />
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="flex items-center gap-2">
+              <Button className="h-12" onClick={saveRound}><Save className="h-4 w-4 mr-1"/> Сохранить раунд</Button>
+              <Button variant="secondary" className="h-12" onClick={()=>{
+                const ids = players.map(p=>p.id);
+                const maxCourts = Math.min(Math.floor(ids.length/4), Math.max(1, courtCount));
+                const pairs = makeRoundPairs(ids).slice(0, maxCourts);
+                setActivePairs(pairs);
+                setRoundResults(pairs.map((_,i)=>({court:i+1,aScore:0,bScore:0})));
+              }}><Shuffle className="h-4 w-4 mr-1"/> Новые пары</Button>
+            </div>
+
+            <Separator />
+            <HistoryList matches={matches} players={players} emptyText="Пока нет раундов"/>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      <motion.div layout>
+        <LeaderboardCard title={`Таблица (${mode === 'american' ? 'Американка' : 'Мексиканка'})`} board={buildBoard(players, totals)} onReset={onResetTotals} />
+        <div className="mt-2">
+          <Button variant="outline" onClick={onClear}><History className="h-4 w-4 mr-1"/> Очистить историю</Button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+function TeamPicker({ label, players, value, onChange }) {
+  function toggle(id) {
+    if (value.includes(id)) onChange(value.filter(x => x !== id));
+    else if (value.length < 2) onChange([...value, id]);
+  }
+  return (
+    <div>
+      <Label>{label}</Label>
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        {players.map(p => (
+          <motion.button key={p.id} layout onClick={() => toggle(p.id)} initial={{opacity:0, scale:0.98}} animate={{opacity:1, scale:1}}
+            className={`rounded-xl border p-3 text-left transition active:scale-[0.99] ${value.includes(p.id) ? "ring-2 ring-offset-1" : "opacity-90"}`} style={{ borderColor: p.color || "#ddd" }}>
+            <div className="flex items-center gap-2">
+              <div className="h-5 w-5 rounded-full border" style={{ background: p.color || "#eee" }}/>
+              <span className="font-medium text-sm sm:text-base">{p.name}</span>
+            </div>
+          </motion.button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function HistoryList({ matches, players, emptyText }) {
+  function fmt(d) { try { return new Date(d).toLocaleString(); } catch { return d; } }
+  function names(ids) { return ids.map(id=> players.find(p=>p.id===id)?.name || "?").join(", "); }
+  return (
+    <div>
+      <Label><History className="inline h-4 w-4 mr-1"/> История</Label>
+      {matches.length === 0 ? (
+        <p className="text-sm text-muted-foreground">{emptyText}</p>
+      ) : (
+        <ul className="space-y-2 mt-2">
+          <AnimatePresence>
+            {matches.map(m => (
+              <motion.li key={m.id} layout initial={{opacity:0, y:6}} animate={{opacity:1, y:0}} exit={{opacity:0, y:-6}} className="rounded-xl border p-3">
+                <div className="text-xs text-muted-foreground">{fmt(m.date)}</div>
+                <div className="text-sm mt-1">{m.scoreText}</div>
+                <div className="text-xs mt-1">Игроки: {names(m.participants)}</div>
+              </motion.li>
+            ))}
+          </AnimatePresence>
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function buildBoard(players, totals) {
+  return [...players].map(p => ({ id: p.id, name: p.name, score: totals[p.id] || 0, color: p.color }))
+    .sort((a,b)=> b.score - a.score);
+}
+
+function LeaderboardCard({ title, board, onReset }) {
+  return (
+    <Card>
+      <CardHeader className="flex items-center justify-between">
+        <CardTitle className="flex items-center gap-2"><ListOrdered className="h-5 w-5"/> {title}</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex justify-end">
+          <Button variant="outline" onClick={onReset}>Сбросить очки</Button>
+        </div>
+        {board.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Добавьте игроков.</p>
+        ) : (
+          <div className="divide-y rounded-xl border overflow-hidden">
+            <AnimatePresence>
+              {board.map((r, i) => (
+                <motion.div key={r.id} layout initial={{opacity:0}} animate={{opacity:1}} className="flex items-center justify-between p-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 text-center font-semibold">{i+1}</div>
+                    <div className="h-5 w-5 rounded-full border" style={{ background: r.color || "#eee" }} />
+                    <div className="font-medium">{r.name}</div>
+                  </div>
+                  <div className="text-lg font-bold">{r.score}</div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function ImportExport({ onLoadAll }) {
+  function exportJson() {
+    const raw = localStorage.getItem("padel_scorer_state_v2");
+    const blob = new Blob([raw || "{}"], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `padel-scorer-${new Date().toISOString().slice(0,10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function importJson(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(String(reader.result));
+        onLoadAll(parsed);
+        localStorage.setItem("padel_scorer_state_v2", JSON.stringify(parsed));
+        toast.success("Данные импортированы");
+      } catch {
+        toast.error("Не удалось прочитать файл");
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <Button variant="secondary" onClick={exportJson}><Save className="h-4 w-4 mr-1"/> Экспорт</Button>
+      <Dialog>
+        <DialogTrigger asChild>
+          <Button variant="outline"><Upload className="h-4 w-4 mr-1"/> Импорт</Button>
+        </DialogTrigger>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Импорт данных</DialogTitle>
+            <DialogDescription>Загрузите .json, экспортированный из этого приложения.</DialogDescription>
+          </DialogHeader>
+          <Input type="file" accept="application/json" onChange={importJson}/>
+          <DialogFooter>
+            <Button variant="secondary">Закрыть</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function labelOf(ids, players) {
+  return ids.map(id => players.find(p=>p.id===id)?.name || "?").join(" + ");
+}
+
+function makeRoundPairs(playerIds) {
+  const ids = [...playerIds];
+  const pairs = [];
+  for (let i = ids.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+  }
+  for (let i = 0; i + 3 < ids.length; i += 4) {
+    pairs.push([ids[i], ids[i + 1], ids[i + 2], ids[i + 3]]);
+  }
+  return pairs;
+}
