@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 
-// quick minimal UI primitives
+// Minimal UI
 const Button = ({children, className='', variant, size, ...props}) => {
   const base='inline-flex items-center justify-center rounded-xl border px-3 py-2 text-sm transition active:scale-[0.99]';
   const variants={default:'bg-white hover:bg-gray-50 border-gray-200',secondary:'bg-gray-100 hover:bg-gray-200 border-gray-200',outline:'bg-transparent hover:bg-gray-50 border-gray-300',ghost:'bg-transparent border-transparent hover:bg-gray-50'};
@@ -17,9 +17,6 @@ const CardContent = ({children,className})=> <div className={`p-4 space-y-2 ${cl
 const Input = (props)=> <input {...props} className={`h-9 w-full rounded-md border border-gray-300 px-3 ${props.className||''}`} />;
 const Label = ({children,className})=> <label className={`text-sm font-medium ${className||''}`}>{children}</label>;
 const Separator = ()=> <hr className="my-2 border-gray-200" />;
-
-// icons (fallback text)
-const Icon = ({name}) => <span className="mr-1">[{name}]</span>;
 
 const uid = () => Math.random().toString(36).slice(2, 9);
 const defaultColors = ["#3b82f6","#ef4444","#22c55e","#f59e0b","#a78bfa","#ec4899","#06b6d4","#10b981","#8b5cf6","#f97316"];
@@ -54,17 +51,13 @@ export default function App() {
     <div className="mx-auto max-w-6xl p-4 pb-[5.5rem] sm:pb-4 space-y-4">
       <header className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Padel Scorer</h1>
-        <div className="flex items-center gap-2">
-          <ImportExport onLoadAll={(data)=>{
-            setPlayers(data.players||[]);
-            setM2v2(data.m2v2||{matches:[], totals:{}});
-            setAmerican(data.american||{matches:[], totals:{}});
-            setMexican(data.mexican||{matches:[], totals:{}});
-          }} />
-        </div>
+        <ImportExport onLoadAll={(data)=>{
+          setPlayers(data.players||[]);
+          setM2v2(data.m2v2||{matches:[], totals:{}});
+          setAmerican(data.american||{matches:[], totals:{}});
+          setMexican(data.mexican||{matches:[], totals:{}});
+        }} />
       </header>
-
-      <MobileTips />
 
       <PlayerManager players={players} setPlayers={setPlayers} />
 
@@ -108,17 +101,15 @@ export default function App() {
         )}
       </div>
 
-      <footer className="text-xs text-muted-foreground py-6">
-        Сделано на React + Framer Motion. Данные сохраняются локально. Готово для статического хостинга.
+      <footer className="text-xs text-muted-foreground py-6 space-y-2">
+        <div className="font-semibold">Как формируются пары</div>
+        <div>Перед каждым раундом список игроков перемешивается случайно и разбивается по 4 человека на корт. После сохранения раунда пары автоматически обновляются.</div>
+        <div className="font-semibold">Система подсчёта очков</div>
+        <ul className="list-disc pl-5">
+          <li><b>Матч 2×2:</b> победители получают <b>+3</b> очка (оба игрока из команды).</li>
+          <li><b>Американка/Мексиканка:</b> каждый игрок получает столько очков, сколько набрала его команда в раунде.</li>
+        </ul>
       </footer>
-    </div>
-  );
-}
-
-function MobileTips() {
-  return (
-    <div className="sm:hidden rounded-xl border p-3 text-xs bg-muted/30">
-      Оптимизировано для телефона: крупные кнопки, плавные анимации, вертикальная верстка. Добавьте приложение на домашний экран.
     </div>
   );
 }
@@ -126,11 +117,11 @@ function MobileTips() {
 function PlayerManager({ players, setPlayers }) {
   const [name, setName] = useState("");
   const [colorIdx, setColorIdx] = useState(0);
-  const defaultColors = ["#3b82f6","#ef4444","#22c55e","#f59e0b","#a78bfa","#ec4899","#06b6d4","#10b981","#8b5cf6","#f97316"];
 
   function addPlayer() {
     const n = name.trim();
     if (!n) return;
+    const defaultColors = ["#3b82f6","#ef4444","#22c55e","#f59e0b","#a78bfa","#ec4899","#06b6d4","#10b981","#8b5cf6","#f97316"];
     setPlayers([...players, { id: uid(), name: n, color: defaultColors[colorIdx % defaultColors.length] }]);
     setName(""); setColorIdx(i => (i + 1) % defaultColors.length);
   }
@@ -152,15 +143,15 @@ function PlayerManager({ players, setPlayers }) {
             <div>
               <Label>Цвет</Label>
               <div className="flex items-center gap-2">
-                <div className="h-9 w-14 rounded-md border" style={{ background: defaultColors[colorIdx % defaultColors.length] }} />
-                <Button variant="secondary" onClick={() => setColorIdx((i) => (i + 1) % defaultColors.length)} title="Сменить цвет">↻</Button>
+                <div className="h-9 w-14 rounded-md border" style={{ background: ["#3b82f6","#ef4444","#22c55e","#f59e0b","#a78bfa","#ec4899","#06b6d4","#10b981","#8b5cf6","#f97316"][colorIdx % 10] }} />
+                <Button variant="secondary" onClick={() => setColorIdx((i) => (i + 1) % 10)} title="Сменить цвет">↻</Button>
               </div>
             </div>
             <Button className="h-10 px-5 text-base" onClick={addPlayer}>Добавить</Button>
           </div>
 
           {players.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Добавьте минимум 4 игроков для социальных форматов, или 4 для матча 2×2.</p>
+            <p className="text-sm text-muted-foreground">Добавьте минимум 4 игроков.</p>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
               <AnimatePresence>
@@ -169,7 +160,7 @@ function PlayerManager({ players, setPlayers }) {
                     className="flex items-center justify-between rounded-xl border p-3 text-left active:scale-[0.99] transition">
                     <div className="flex items-center gap-2">
                       <div className="h-6 w-6 rounded-full border" style={{ background: p.color || "#eee" }}/>
-                      <span className="font-medium">{p.name}</span>
+                      <span className="font-semibold text-base">{p.name}</span>
                     </div>
                     <Button variant="ghost" onClick={() => removePlayer(p.id)}>Удалить</Button>
                   </motion.button>
@@ -300,7 +291,14 @@ function SocialRoundFinalInput({ mode, players, matches, totals, onSave, onClear
     const rec = { id: uid(), date: new Date().toISOString(), type: mode, participants, scoreText };
     onSave(rec, delta);
 
-    toast.success("Раунд сохранён");
+    // NEW: после сохранения — сгенерировать новые пары автоматически
+    const ids = players.map(p=>p.id);
+    const maxCourts = Math.min(Math.floor(ids.length/4), Math.max(1, courtCount));
+    const pairs = makeRoundPairs(ids).slice(0, maxCourts);
+    setActivePairs(pairs);
+    setRoundResults(pairs.map((_,i)=>({court:i+1,aScore:0,bScore:0})));
+
+    toast.success("Раунд сохранён, пары обновлены");
   }
 
   function nameOf(id) { return players.find(x => x.id === id)?.name || "?"; }
@@ -334,17 +332,17 @@ function SocialRoundFinalInput({ mode, players, matches, totals, onSave, onClear
                       <div className="text-sm font-semibold">Корт {idx+1}</div>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <div className="font-medium">Команда A</div>
-                          <div className="text-sm">{nameOf(a1)} + {nameOf(a2)}</div>
+                          <div className="font-semibold text-base">Команда A</div>
+                          <div className="text-base font-bold">{nameOf(a1)} <span className="opacity-70">+</span> {nameOf(a2)}</div>
                           <div className="mt-1 flex items-center gap-2">
-                            <Input inputMode="numeric" className="w-20 text-center" value={rr.aScore} onChange={e=> setRoundResults(prev=> prev.map((x,i)=> i===idx? {...x, aScore: parseInt(e.target.value||"0")}:x))} />
+                            <Input inputMode="numeric" className="w-24 text-center text-lg font-semibold" value={rr.aScore} onChange={e=> setRoundResults(prev=> prev.map((x,i)=> i===idx? {...x, aScore: parseInt(e.target.value||"0")}:x))} />
                           </div>
                         </div>
                         <div>
-                          <div className="font-medium">Команда B</div>
-                          <div className="text-sm">{nameOf(b1)} + {nameOf(b2)}</div>
+                          <div className="font-semibold text-base">Команда B</div>
+                          <div className="text-base font-bold">{nameOf(b1)} <span className="opacity-70">+</span> {nameOf(b2)}</div>
                           <div className="mt-1 flex items-center gap-2">
-                            <Input inputMode="numeric" className="w-20 text-center" value={rr.bScore} onChange={e=> setRoundResults(prev=> prev.map((x,i)=> i===idx? {...x, bScore: parseInt(e.target.value||"0")}:x))} />
+                            <Input inputMode="numeric" className="w-24 text-center text-lg font-semibold" value={rr.bScore} onChange={e=> setRoundResults(prev=> prev.map((x,i)=> i===idx? {...x, bScore: parseInt(e.target.value||"0")}:x))} />
                           </div>
                         </div>
                       </div>
@@ -353,20 +351,6 @@ function SocialRoundFinalInput({ mode, players, matches, totals, onSave, onClear
                 })}
               </div>
             )}
-
-            <div className="flex items-center gap-2">
-              <Button className="h-12" onClick={saveRound}>Сохранить раунд</Button>
-              <Button variant="secondary" className="h-12" onClick={()=>{
-                const ids = players.map(p=>p.id);
-                const maxCourts = Math.min(Math.floor(ids.length/4), Math.max(1, courtCount));
-                const pairs = makeRoundPairs(ids).slice(0, maxCourts);
-                setActivePairs(pairs);
-                setRoundResults(pairs.map((_,i)=>({court:i+1,aScore:0,bScore:0})));
-              }}>Новые пары</Button>
-            </div>
-
-            <Separator />
-            <HistoryList matches={matches} players={players} emptyText="Пока нет раундов"/>
           </CardContent>
         </Card>
       </motion.div>
@@ -374,7 +358,14 @@ function SocialRoundFinalInput({ mode, players, matches, totals, onSave, onClear
       <motion.div layout>
         <LeaderboardCard title={`Таблица (${mode === 'american' ? 'Американка' : 'Мексиканка'})`} board={buildBoard(players, totals)} onReset={onResetTotals} />
         <div className="mt-2">
-          <Button variant="outline" onClick={onClear}>Очистить историю</Button>
+          <Button variant="secondary" onClick={()=>{
+            const ids = players.map(p=>p.id);
+            const maxCourts = Math.min(Math.floor(ids.length/4), Math.max(1, courtCount));
+            const pairs = makeRoundPairs(ids).slice(0, maxCourts);
+            setActivePairs(pairs);
+            setRoundResults(pairs.map((_,i)=>({court:i+1,aScore:0,bScore:0})));
+          }}>Новые пары</Button>
+          <Button variant="outline" className="ml-2" onClick={onClear}>Очистить историю</Button>
         </div>
       </motion.div>
     </div>
@@ -395,7 +386,7 @@ function TeamPicker({ label, players, value, onChange }) {
             className={`rounded-xl border p-3 text-left transition active:scale-[0.99] ${value.includes(p.id) ? "ring-2 ring-offset-1" : "opacity-90"}`} style={{ borderColor: p.color || "#ddd" }}>
             <div className="flex items-center gap-2">
               <div className="h-5 w-5 rounded-full border" style={{ background: p.color || "#eee" }}/>
-              <span className="font-medium text-sm sm:text-base">{p.name}</span>
+              <span className="font-semibold text-base">{p.name}</span>
             </div>
           </motion.button>
         ))}
