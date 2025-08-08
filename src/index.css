@@ -3,14 +3,6 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #fff;
-  --muted: #f5f5f5;
-  --border: #e5e7eb;
-}
-
+:root { --background: #fff; --muted: #f5f5f5; --border: #e5e7eb; }
 .bg-background { background: var(--background); }
-.bg-muted\/30 { background: rgba(245,245,245,0.6); }
 .text-muted-foreground { color: #6b7280; }
-.ring-background { box-shadow: 0 0 0 2px var(--background) inset; }
-.safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
